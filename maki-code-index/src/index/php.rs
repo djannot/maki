@@ -138,20 +138,23 @@ impl PhpExtractor {
         let Some(body) = node.child_by_field_name("body") else {
             return Vec::new();
         };
-        let rules = [
-            BodyMemberRule {
-                kind: "method_declaration",
-                handler: BodyMemberHandler::Method(&|n, s| Some(self.method_sig(n, s))),
-            },
-            BodyMemberRule {
-                kind: "property_declaration",
-                handler: BodyMemberHandler::FieldTruncated {
-                    format_fn: &|n, s| self.property_text(n, s),
-                    counter: "property_declaration",
+        extract_body_members(
+            body,
+            source,
+            &[
+                BodyMemberRule {
+                    kind: "method_declaration",
+                    handler: BodyMemberHandler::Method(&|n, s| Some(self.method_sig(n, s))),
                 },
-            },
-        ];
-        extract_body_members(body, source, &rules)
+                BodyMemberRule {
+                    kind: "property_declaration",
+                    handler: BodyMemberHandler::FieldTruncated {
+                        format_fn: &|n, s| self.property_text(n, s),
+                        counter: "property_declaration",
+                    },
+                },
+            ],
+        )
     }
 
     fn method_sig(&self, node: Node, source: &[u8]) -> String {
