@@ -31,9 +31,9 @@ use rmcp::{
     handler::server::{router::tool::ToolRouter, wrapper::Parameters},
     model::{CallToolResult, Content, Implementation, ProtocolVersion, ServerCapabilities, ServerInfo},
     schemars, tool, tool_handler, tool_router,
-    transport::stdio,
 };
 use serde::Deserialize;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 /// Default file-size cap: 2 MiB. Large files are rejected so callers fall back
 /// to incremental reads instead of loading enormous blobs into the parser.
@@ -146,10 +146,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "starting maki-code-index-mcp on stdio transport"
     );
 
+    let (stdin_rx, mut stdin_tx) = tokio::io::duplex(64 * 1024);
+    tokio::spawn(async move {
+        let mut lines = BufReader::new(tokio::io::stdin()).lines();
+        let mut initialized = false;
+        let mut stdout = tokio::io::stdout();
+
+        while let Ok(Some(line)) = lines.next_line().await {
+            if !initialized {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&line) {
+                    let method = val.get("method").and_then(|m| m.as_str());
+                    if method == Some("initialize") {
+                        initialized = true;
+                    } else {
+                        if let Some(id) = val.get("id") {
+                            let resp = serde_json::json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": {
+                                    "code": -32601,
+                                    "message": "Method not found"
+                                }
+                            });
+                            let mut out = resp.to_string();
+                            out.push('\n');
+                            let _ = stdout.write_all(out.as_bytes()).await;
+                            let _ = stdout.flush().await;
+                        }
+                        continue;
+                    }
+                }
+            }
+            let mut forwarded = line;
+            forwarded.push('\n');
+            if stdin_tx.write_all(forwarded.as_bytes()).await.is_err() {
+                break;
+            }
+        }
+    });
+
     let server = IndexServer::new(max_file_size);
-    let service = server.serve(stdio()).await.inspect_err(|e| {
-        tracing::error!("failed to start server: {e:?}");
-    })?;
+    let service = server
+        .serve((stdin_rx, tokio::io::stdout()))
+        .await
+        .inspect_err(|e| {
+            tracing::error!("failed to start server: {e:?}");
+        })?;
 
     service.waiting().await?;
     Ok(())
