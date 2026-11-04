@@ -87,45 +87,48 @@ impl ScalaExtractor {
         }) else {
             return Vec::new();
         };
-        let rules = [
-            BodyMemberRule {
-                kind: "function_definition",
-                handler: BodyMemberHandler::Method(&|n, s| Some(self.fn_sig(n, s))),
-            },
-            BodyMemberRule {
-                kind: "function_declaration",
-                handler: BodyMemberHandler::Method(&|n, s| Some(self.fn_sig(n, s))),
-            },
-            BodyMemberRule {
-                kind: "val_definition",
-                handler: BodyMemberHandler::FieldTruncated {
-                    format_fn: &|n, s| self.val_text(n, s),
-                    counter: "val",
+        extract_body_members(
+            body,
+            source,
+            &[
+                BodyMemberRule {
+                    kind: "function_definition",
+                    handler: BodyMemberHandler::Method(&|n, s| Some(self.fn_sig(n, s))),
                 },
-            },
-            BodyMemberRule {
-                kind: "var_definition",
-                handler: BodyMemberHandler::FieldTruncated {
-                    format_fn: &|n, s| self.val_text(n, s),
-                    counter: "val",
+                BodyMemberRule {
+                    kind: "function_declaration",
+                    handler: BodyMemberHandler::Method(&|n, s| Some(self.fn_sig(n, s))),
                 },
-            },
-            BodyMemberRule {
-                kind: "val_declaration",
-                handler: BodyMemberHandler::FieldTruncated {
-                    format_fn: &|n, s| self.val_text(n, s),
-                    counter: "val",
+                BodyMemberRule {
+                    kind: "val_definition",
+                    handler: BodyMemberHandler::FieldTruncated {
+                        format_fn: &|n, s| self.val_text(n, s),
+                        counter: "val",
+                    },
                 },
-            },
-            BodyMemberRule {
-                kind: "var_declaration",
-                handler: BodyMemberHandler::FieldTruncated {
-                    format_fn: &|n, s| self.val_text(n, s),
-                    counter: "val",
+                BodyMemberRule {
+                    kind: "var_definition",
+                    handler: BodyMemberHandler::FieldTruncated {
+                        format_fn: &|n, s| self.val_text(n, s),
+                        counter: "val",
+                    },
                 },
-            },
-        ];
-        extract_body_members(body, source, &rules)
+                BodyMemberRule {
+                    kind: "val_declaration",
+                    handler: BodyMemberHandler::FieldTruncated {
+                        format_fn: &|n, s| self.val_text(n, s),
+                        counter: "val",
+                    },
+                },
+                BodyMemberRule {
+                    kind: "var_declaration",
+                    handler: BodyMemberHandler::FieldTruncated {
+                        format_fn: &|n, s| self.val_text(n, s),
+                        counter: "val",
+                    },
+                },
+            ],
+        )
     }
 
     fn fn_sig(&self, node: Node, source: &[u8]) -> String {

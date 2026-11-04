@@ -81,26 +81,29 @@ impl CppExtractor {
         let Some(body) = node.child_by_field_name("body") else {
             return Vec::new();
         };
-        let rules = [
-            BodyMemberRule {
-                kind: "function_definition",
-                handler: BodyMemberHandler::Method(&|n, s| self.method_sig(n, s)),
-            },
-            BodyMemberRule {
-                kind: "declaration",
-                handler: BodyMemberHandler::Method(&|n, s| self.decl_sig(n, s)),
-            },
-            BodyMemberRule {
-                kind: "field_declaration",
-                handler: BodyMemberHandler::FieldTruncated {
-                    format_fn: &|n, s| {
-                        compact_ws(node_text(n, s).trim_end_matches(';')).into_owned()
-                    },
-                    counter: "field_declaration",
+        extract_body_members(
+            body,
+            source,
+            &[
+                BodyMemberRule {
+                    kind: "function_definition",
+                    handler: BodyMemberHandler::Method(&|n, s| self.method_sig(n, s)),
                 },
-            },
-        ];
-        extract_body_members(body, source, &rules)
+                BodyMemberRule {
+                    kind: "declaration",
+                    handler: BodyMemberHandler::Method(&|n, s| self.decl_sig(n, s)),
+                },
+                BodyMemberRule {
+                    kind: "field_declaration",
+                    handler: BodyMemberHandler::FieldTruncated {
+                        format_fn: &|n, s| {
+                            compact_ws(node_text(n, s).trim_end_matches(';')).into_owned()
+                        },
+                        counter: "field_declaration",
+                    },
+                },
+            ],
+        )
     }
 
     fn method_sig(&self, node: Node, source: &[u8]) -> Option<String> {
